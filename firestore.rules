@@ -1,0 +1,263 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return isAuthenticated() && request.auth.token.roles.hasAny(["owner"]);
+    }
+
+    function isPlatformAdmin() {
+      return isAuthenticated() && request.auth.token.roles.hasAny(["owner", "platform_administrator", "system_administrator"]);
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.roles.hasAny(["owner", "platform_administrator", "system_administrator", "operations_coordinator"]);
+    }
+
+    function isStaff() {
+      return isAuthenticated() && request.auth.token.roles.hasAny([
+        "owner", "platform_administrator", "system_administrator", "operations_coordinator",
+        "finance_and_bookkeeping", "marketing_manager", "sales_representative",
+        "collections_representative", "program_manager", "instructor_or_coach",
+        "sports_operations", "content_creator", "secretary_and_outreach"
+      ]);
+    }
+
+    function canAccessAdminPanel() {
+      return isAuthenticated() && request.auth.token.permissions.accessAdminPanel == true;
+    }
+
+    function canViewFinancials() {
+      return isAuthenticated() && request.auth.token.permissions.viewFinancials == true;
+    }
+
+    function canManageFinancials() {
+      return isAuthenticated() && request.auth.token.permissions.manageFinancials == true;
+    }
+
+    function canManageContacts() {
+      return isAuthenticated() && request.auth.token.permissions.manageContacts == true;
+    }
+
+    function canManagePrograms() {
+      return isAuthenticated() && request.auth.token.permissions.managePrograms == true;
+    }
+
+    function canManageUsers() {
+      return isAuthenticated() && request.auth.token.permissions.manageUsers == true;
+    }
+
+    function canSendClientMessages() {
+      return isAuthenticated() && request.auth.token.permissions.sendClientMessages == true;
+    }
+
+    function isUserSelf(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function belongsToOrganization(organizationId) {
+      return isAuthenticated() && request.auth.token.organizationId == organizationId;
+    }
+
+    function hasProgramAccess(programId) {
+      return isAuthenticated() && request.auth.token.programIds.hasAny([programId]);
+    }
+
+    function hasDepartmentAccess(departmentId) {
+      return isAuthenticated() && request.auth.token.departmentIds.hasAny([departmentId]);
+    }
+
+    // Users collection - users can read their own doc, admins can read/write all
+    match /users/{userId} {
+      allow read: if isUserSelf(userId) || isPlatformAdmin();
+      allow write: if isPlatformAdmin();
+    }
+
+    // User access control - users can read their own, admins can manage all
+    match /userAccess/{userId} {
+      allow read: if isUserSelf(userId) || isPlatformAdmin();
+      allow create, update: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow delete: if isOwner();
+    }
+
+    // Organizations - platform admins only
+    match /organizations/{organizationId} {
+      allow read: if isAuthenticated() && belongsToOrganization(organizationId);
+      allow write: if isPlatformAdmin() && belongsToOrganization(organizationId);
+    }
+
+    // Programs - staff can read, program managers and admins can write
+    match /programs/{programId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if isAdmin() || (canManagePrograms() && belongsToOrganization(request.resource.data.organizationId));
+      allow update: if isAdmin() || (canManagePrograms() && belongsToOrganization(resource.data.organizationId));
+      allow delete: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Departments
+    match /departments/{departmentId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if isAdmin() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow delete: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Locations
+    match /locations/{locationId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if isAdmin() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow delete: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Contacts - staff can read, contact managers can write
+    match /contacts/{contactId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if canManageContacts() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if canManageContacts() && belongsToOrganization(resource.data.organizationId);
+      allow delete: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Staff - staff can read own, admins can manage
+    match /staff/{staffId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if isAdmin() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow delete: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Financial accounts - finance only
+    match /financialAccounts/{accountId} {
+      allow read: if canViewFinancials() && belongsToOrganization(resource.data.organizationId);
+      allow write: if canManageFinancials() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Financial transactions - finance only, append-only preferred
+    match /financialTransactions/{transactionId} {
+      allow read: if canViewFinancials() && belongsToOrganization(resource.data.organizationId);
+      allow create: if canManageFinancials() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if canManageFinancials() && belongsToOrganization(resource.data.organizationId) && resource.data.approvalStatus != 'approved';
+      allow delete: if isOwner() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Financial periods
+    match /financialPeriods/{periodId} {
+      allow read: if canViewFinancials() && belongsToOrganization(resource.data.organizationId);
+      allow write: if canManageFinancials() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Compensation plans
+    match /compensationPlans/{planId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if canManageFinancials() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Compensation calculations
+    match /compensationCalculations/{calcId} {
+      allow read: if (isStaff() || canViewFinancials()) && belongsToOrganization(resource.data.organizationId);
+      allow write: if canManageFinancials() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Payouts
+    match /payouts/{payoutId} {
+      allow read: if canViewFinancials() && belongsToOrganization(resource.data.organizationId);
+      allow create: if canManageFinancials() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if canManageFinancials() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Communications
+    match /communications/{commId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if canSendClientMessages() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow delete: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Communication templates
+    match /communicationTemplates/{templateId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Communication jobs
+    match /communicationJobs/{jobId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if canSendClientMessages() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Classes
+    match /classSessions/{sessionId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if canManagePrograms() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Registrations
+    match /registrations/{registrationId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if canManageContacts() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Attendance
+    match /attendance/{attendanceId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow create: if isStaff() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if canManagePrograms() && belongsToOrganization(resource.data.organizationId);
+      allow delete: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Leads
+    match /leads/{leadId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if canManageContacts() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Integrations
+    match /integrations/{integrationId} {
+      allow read: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow write: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Webhook events
+    match /webhookEvents/{eventId} {
+      allow read: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Audit logs - read-only for admins, system writes
+    match /auditLogs/{logId} {
+      allow read: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+      allow write: if isAuthenticated() && belongsToOrganization(request.resource.data.organizationId);
+    }
+
+    // System settings
+    match /systemSettings/{settingId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if isPlatformAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Reports
+    match /reports/{reportId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId) && (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow create: if isStaff() && belongsToOrganization(request.resource.data.organizationId);
+      allow update: if isAdmin() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Alerts
+    match /alerts/{alertId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if isAuthenticated() && belongsToOrganization(resource.data.organizationId);
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      allow read: if isStaff() && belongsToOrganization(resource.data.organizationId);
+      allow write: if isStaff() && belongsToOrganization(resource.data.organizationId);
+    }
+  }
+}

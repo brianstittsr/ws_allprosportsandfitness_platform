@@ -1,0 +1,78 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.roles.hasAny(["owner", "platform_administrator", "system_administrator"]);
+    }
+
+    function isStaff() {
+      return isAuthenticated() && request.auth.token.roles.hasAny([
+        "owner", "platform_administrator", "system_administrator", "operations_coordinator",
+        "finance_and_bookkeeping", "marketing_manager", "sales_representative",
+        "collections_representative", "program_manager", "instructor_or_coach",
+        "sports_operations", "content_creator", "secretary_and_outreach"
+      ]);
+    }
+
+    function belongsToOrganization(organizationId) {
+      return isAuthenticated() && request.auth.token.organizationId == organizationId;
+    }
+
+    // Organization documents
+    match /organizations/{organizationId}/{allPaths=**} {
+      allow read: if isStaff() && belongsToOrganization(organizationId);
+      allow write: if isAdmin() && belongsToOrganization(organizationId);
+    }
+
+    // Contact documents
+    match /contacts/{organizationId}/{allPaths=**} {
+      allow read: if isStaff() && belongsToOrganization(organizationId);
+      allow write: if isStaff() && belongsToOrganization(organizationId);
+    }
+
+    // Staff documents
+    match /staff/{organizationId}/{allPaths=**} {
+      allow read: if isStaff() && belongsToOrganization(organizationId);
+      allow write: if isAdmin() && belongsToOrganization(organizationId);
+    }
+
+    // Program documents
+    match /programs/{organizationId}/{allPaths=**} {
+      allow read: if isStaff() && belongsToOrganization(organizationId);
+      allow write: if isAdmin() && belongsToOrganization(organizationId);
+    }
+
+    // Financial documents
+    match /financial/{organizationId}/{allPaths=**} {
+      allow read: if isAuthenticated() && request.auth.token.permissions.viewFinancials == true && belongsToOrganization(organizationId);
+      allow write: if isAuthenticated() && request.auth.token.permissions.manageFinancials == true && belongsToOrganization(organizationId);
+    }
+
+    // Reports and exports
+    match /reports/{organizationId}/{allPaths=**} {
+      allow read: if isStaff() && belongsToOrganization(organizationId);
+      allow write: if isStaff() && belongsToOrganization(organizationId);
+    }
+
+    // Waivers and legal documents
+    match /waivers/{organizationId}/{allPaths=**} {
+      allow read: if isStaff() && belongsToOrganization(organizationId);
+      allow write: if isStaff() && belongsToOrganization(organizationId);
+    }
+
+    // Public logo and images
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
