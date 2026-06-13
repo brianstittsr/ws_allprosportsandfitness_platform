@@ -43,6 +43,46 @@ export default function CommunicationsAdminPage() {
 
   const [fbPostContent, setFbPostContent] = useState("");
   const [fbPosting, setFbPosting] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupDescription, setGroupDescription] = useState("");
+  const [groupPrivacy, setGroupPrivacy] = useState("CLOSED");
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [fbGroups, setFbGroups] = useState<Array<{ id: string; name: string; status: string; facebookGroupId?: string }>>([]);
+
+  useEffect(() => { fetchFacebookGroups(); }, [organizationId]);
+
+  const fetchFacebookGroups = async () => {
+    try {
+      const idToken = await user?.getIdToken();
+      const response = await fetch(`/api/facebook/groups?organizationId=${organizationId}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const result = await response.json();
+      if (response.ok) setFbGroups(result.data || []);
+    } catch { /* ignore */ }
+  };
+
+  const handleCreateFacebookGroup = async () => {
+    if (!groupName.trim()) { toast.error("Group name is required"); return; }
+    setCreatingGroup(true);
+    try {
+      const idToken = await user?.getIdToken();
+      const response = await fetch("/api/facebook/groups", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: groupName, description: groupDescription, privacy: groupPrivacy, organizationId }),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(result.data.message);
+        setGroupName(""); setGroupDescription(""); setGroupPrivacy("CLOSED");
+        fetchFacebookGroups();
+      } else {
+        toast.error(result.error || "Failed to create group");
+      }
+    } catch { toast.error("Group creation request failed"); }
+    finally { setCreatingGroup(false); }
+  };
 
   const handlePublishToFacebook = async () => {
     if (!fbPostContent.trim()) { toast.error("Post content is required"); return; }
@@ -117,6 +157,62 @@ export default function CommunicationsAdminPage() {
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-3">
+            <Globe className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <CardTitle>Create Facebook Group</CardTitle>
+              <CardDescription>Create a new group for your community or team.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <input
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                placeholder="Group name (e.g., NC Fitness Club Members)"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <textarea
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground"
+                placeholder="Group description"
+                value={groupDescription}
+                onChange={(e) => setGroupDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                value={groupPrivacy}
+                onChange={(e) => setGroupPrivacy(e.target.value)}
+              >
+                <option value="CLOSED">Closed (visible, membership by approval)</option>
+                <option value="OPEN">Open (visible, anyone can join)</option>
+                <option value="SECRET">Secret (hidden, invite only)</option>
+              </select>
+            </div>
+            <Button onClick={handleCreateFacebookGroup} disabled={creatingGroup || !groupName.trim()}>
+              <Globe className="h-4 w-4 mr-2" />{creatingGroup ? "Creating..." : "Create Group"}
+            </Button>
+
+            {fbGroups.length > 0 && (
+              <div className="pt-2 border-t">
+                <p className="text-xs font-medium mb-2">Recently Created Groups</p>
+                <div className="space-y-1">
+                  {fbGroups.slice(0, 5).map((g) => (
+                    <div key={g.id} className="flex items-center justify-between text-xs">
+                      <span className="truncate max-w-[200px]">{g.name}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${g.status === "active" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{g.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader><CardTitle>Communication Jobs</CardTitle><CardDescription>Recent campaigns and sends.</CardDescription></CardHeader>
           <CardContent>

@@ -412,6 +412,72 @@ export default function SettingsAdminPage() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="mt-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <CardTitle className="text-base">Facebook Messenger & Hermes</CardTitle>
+                <CardDescription>Configure Messenger webhook and enable Hermes AI auto-responses.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Messenger Webhook URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/facebook/webhook`}
+                  className="font-mono text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const url = `${typeof window !== "undefined" ? window.location.origin : ""}/api/facebook/webhook`;
+                    navigator.clipboard.writeText(url);
+                    toast.success("Webhook URL copied");
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Paste this URL in your Meta App Dashboard under Messenger → Webhooks. Set the Verify Token to <code>hermes_webhook_verify_2024</code> or configure <code>FACEBOOK_MESSENGER_VERIFY_TOKEN</code> in your environment.
+              </p>
+            </div>
+            <div className="border rounded-md p-3 space-y-2">
+              <p className="text-sm font-medium">Hermes AI Auto-Response</p>
+              <p className="text-xs text-muted-foreground">
+                When enabled, Hermes will automatically respond to incoming Facebook Messenger messages using your connected Page.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={integrations.some((i) => i.provider === "facebook" && i.status === "active")}
+                  readOnly
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label className="text-sm font-normal">
+                  {integrations.some((i) => i.provider === "facebook" && i.status === "active")
+                    ? "Hermes is active (Facebook integration enabled)"
+                    : "Hermes is inactive (enable Facebook integration above)"}
+                </Label>
+              </div>
+            </div>
+            <div className="bg-muted p-3 rounded-md text-xs text-muted-foreground space-y-1">
+              <p><strong>Setup steps:</strong></p>
+              <p>1. Add a Facebook integration above with provider "facebook".</p>
+              <p>2. Enter your Page Access Token (must have <code>pages_messaging</code> permission).</p>
+              <p>3. In Meta App Dashboard, subscribe your app to the Page's messaging webhook.</p>
+              <p>4. Hermes will automatically respond to all incoming Messenger messages.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

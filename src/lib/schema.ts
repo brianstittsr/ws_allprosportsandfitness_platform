@@ -60,6 +60,8 @@ export const COLLECTIONS = {
   webhookEvents: "webhookEvents",
   /** Background tasks queue */
   tasks: "tasks",
+  /** Facebook groups managed through the platform */
+  facebookGroups: "facebookGroups",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
