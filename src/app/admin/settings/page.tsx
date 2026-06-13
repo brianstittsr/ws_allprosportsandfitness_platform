@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { type Integration } from "@/types";
-import { Activity, MessageSquare, CreditCard, Send, Bot, GitBranch, Mail, Bell, RefreshCw } from "lucide-react";
+import { Activity, MessageSquare, CreditCard, Send, Bot, GitBranch, Mail, Bell, RefreshCw, Globe } from "lucide-react";
 
 const integrationIcons: Record<string, React.ElementType> = {
   highlevel: Activity,
@@ -21,6 +21,7 @@ const integrationIcons: Record<string, React.ElementType> = {
   slack: Bell,
   github: GitBranch,
   sms: Send,
+  facebook: Globe,
   default: Activity,
 };
 
@@ -37,6 +38,8 @@ export default function SettingsAdminPage() {
   const [telegramInfo, setTelegramInfo] = useState<{ username: string; first_name: string; id: number } | null>(null);
   const [telegramWebhookUrl, setTelegramWebhookUrl] = useState("");
   const [telegramLoading, setTelegramLoading] = useState(false);
+  const [facebookConfig, setFacebookConfig] = useState<{ pageId: string; accessToken: string; appId: string }>({ pageId: "", accessToken: "", appId: "" });
+  const [facebookLoading, setFacebookLoading] = useState(false);
   const organizationId = userAccess?.organizationId || "default";
 
   useEffect(() => { fetchIntegrations(); }, [organizationId]);
@@ -123,6 +126,44 @@ export default function SettingsAdminPage() {
     finally { setTelegramLoading(false); }
   };
 
+  const handleSaveFacebookConfig = async () => {
+    setFacebookLoading(true);
+    try {
+      const fbIntegration = integrations.find((i) => i.provider === "facebook");
+      if (!fbIntegration) { toast.error("No Facebook integration found. Add one first."); return; }
+      const now = Timestamp.now();
+      await updateDoc(doc(db, COLLECTIONS.integrations, fbIntegration.id), {
+        config: {
+          pageId: facebookConfig.pageId,
+          accessToken: facebookConfig.accessToken,
+          appId: facebookConfig.appId,
+        },
+        updatedAt: now,
+        updatedBy: user?.uid,
+        status: "active",
+      });
+      toast.success("Facebook configuration saved");
+      fetchIntegrations();
+    } catch { toast.error("Failed to save Facebook configuration"); }
+    finally { setFacebookLoading(false); }
+  };
+
+  const handleTestFacebookConnection = async () => {
+    setFacebookLoading(true);
+    try {
+      const idToken = await user?.getIdToken();
+      const response = await fetch("/api/facebook/test", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: facebookConfig.pageId, accessToken: facebookConfig.accessToken }),
+      });
+      const data = await response.json();
+      if (response.ok) { toast.success(`Connected to Facebook Page: ${data.data?.pageName || "Unknown"}`); }
+      else { toast.error(data.error || "Failed to connect to Facebook"); }
+    } catch { toast.error("Connection test failed"); }
+    finally { setFacebookLoading(false); }
+  };
+
   const handleAddIntegration = async () => {
     if (!newIntegration.name || !newIntegration.provider) { toast.error("Name and provider are required"); return; }
     try {
@@ -153,6 +194,7 @@ export default function SettingsAdminPage() {
     { value: "slack", label: "Slack (Notifications)" },
     { value: "github", label: "GitHub (Code Updates)" },
     { value: "twilio", label: "Twilio (SMS)" },
+    { value: "facebook", label: "Facebook (Social Media)" },
   ];
 
   const typeOptions = [
@@ -325,6 +367,48 @@ export default function SettingsAdminPage() {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <CardTitle className="text-base">Facebook Page Configuration</CardTitle>
+                <CardDescription>Connect your Facebook Page to publish posts and updates.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Page ID</Label>
+                <Input value={facebookConfig.pageId} onChange={(e) => setFacebookConfig({ ...facebookConfig, pageId: e.target.value })} placeholder="123456789012345" />
+                <p className="text-xs text-muted-foreground">Your Facebook Page numeric ID.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Page Access Token</Label>
+                <Input type="password" value={facebookConfig.accessToken} onChange={(e) => setFacebookConfig({ ...facebookConfig, accessToken: e.target.value })} placeholder="EAAXYZ..." />
+                <p className="text-xs text-muted-foreground">Long-lived Page Access Token from Meta.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>App ID (optional)</Label>
+                <Input value={facebookConfig.appId} onChange={(e) => setFacebookConfig({ ...facebookConfig, appId: e.target.value })} placeholder="1234567890" />
+                <p className="text-xs text-muted-foreground">Your Meta App ID for reference.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveFacebookConfig} disabled={facebookLoading}>Save Config</Button>
+              <Button size="sm" variant="outline" onClick={handleTestFacebookConnection} disabled={facebookLoading || !facebookConfig.pageId || !facebookConfig.accessToken}>
+                {facebookLoading ? "Testing..." : "Test Connection"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ensure a Facebook integration record exists above with provider set to "facebook" before saving.
+            </p>
           </CardContent>
         </Card>
       </div>

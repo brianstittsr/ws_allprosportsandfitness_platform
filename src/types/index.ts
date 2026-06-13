@@ -553,7 +553,7 @@ export interface CommunicationJob extends BaseDocument {
   name: string;
   templateId: string;
   audienceFilter: AudienceFilter;
-  channel: "email" | "sms" | "telegram" | "slack" | "in_app";
+  channel: "email" | "sms" | "telegram" | "slack" | "facebook" | "in_app";
   scheduledAt?: Timestamp;
   sentAt?: Timestamp;
   status: "draft" | "pending_approval" | "scheduled" | "sending" | "sent" | "failed" | "cancelled";
@@ -582,7 +582,7 @@ export interface AudienceFilter {
 export interface Integration extends BaseDocument {
   name: string;
   provider: string;
-  type: "crm" | "payment" | "communication" | "calendar" | "analytics" | "custom";
+  type: "crm" | "payment" | "communication" | "calendar" | "analytics" | "social_media" | "custom";
   status: "active" | "inactive" | "error" | "pending";
   config: Record<string, string>;
   webhookUrl?: string;

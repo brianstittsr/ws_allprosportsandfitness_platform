@@ -9,10 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { type CommunicationJob, type CommunicationTemplate } from "@/types";
-import { Mail, MessageSquare, Send, Users } from "lucide-react";
+import { Mail, MessageSquare, Send, Users, Globe } from "lucide-react";
 
 export default function CommunicationsAdminPage() {
-  const { userAccess } = useAuth();
+  const { user, userAccess } = useAuth();
   const [jobs, setJobs] = useState<CommunicationJob[]>([]);
   const [templates, setTemplates] = useState<CommunicationTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +37,33 @@ export default function CommunicationsAdminPage() {
   const channelIcon = (channel: string) => {
     if (channel === "email") return <Mail className="h-4 w-4" />;
     if (channel === "sms") return <MessageSquare className="h-4 w-4" />;
+    if (channel === "facebook") return <Globe className="h-4 w-4" />;
     return <Send className="h-4 w-4" />;
+  };
+
+  const [fbPostContent, setFbPostContent] = useState("");
+  const [fbPosting, setFbPosting] = useState(false);
+
+  const handlePublishToFacebook = async () => {
+    if (!fbPostContent.trim()) { toast.error("Post content is required"); return; }
+    setFbPosting(true);
+    try {
+      const idToken = await user?.getIdToken();
+      const response = await fetch("/api/facebook/publish", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: fbPostContent, organizationId }),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        toast.success("Published to Facebook successfully");
+        setFbPostContent("");
+        fetchData();
+      } else {
+        toast.error(result.error || "Failed to publish to Facebook");
+      }
+    } catch { toast.error("Publish request failed"); }
+    finally { setFbPosting(false); }
   };
 
   const stats = [
@@ -65,6 +91,30 @@ export default function CommunicationsAdminPage() {
           </Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <Globe className="h-5 w-5 text-muted-foreground" />
+          <div>
+            <CardTitle>Push to Facebook</CardTitle>
+            <CardDescription>Publish a post directly to your connected Facebook Page.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <textarea
+            className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="What's on your mind? Write your Facebook post here..."
+            value={fbPostContent}
+            onChange={(e) => setFbPostContent(e.target.value)}
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">{fbPostContent.length}/2000 characters</p>
+            <Button onClick={handlePublishToFacebook} disabled={fbPosting || !fbPostContent.trim()}>
+              <Globe className="h-4 w-4 mr-2" />{fbPosting ? "Publishing..." : "Publish to Facebook"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
