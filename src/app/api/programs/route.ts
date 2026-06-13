@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 import { programSchema } from "@/schemas";
 
 export async function GET(request: NextRequest) {
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const snapshot = await adminDb
-      .collection("programs")
+      .collection(COLLECTIONS.programs)
       .where("organizationId", "==", organizationId)
       .orderBy("createdAt", "desc")
       .limit(100)
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = programSchema.parse(body);
 
-    const docRef = await adminDb.collection("programs").add({
+    const docRef = await adminDb.collection(COLLECTIONS.programs).add({
       ...validated,
       organizationId: body.organizationId,
       createdAt: new Date(),

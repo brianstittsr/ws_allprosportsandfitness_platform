@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ export default function LocationsAdminPage() {
   const fetchLocations = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "locations"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.locations), where("organizationId", "==", organizationId));
       const snapshot = await getDocs(q);
       setLocations(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Location));
     } catch { toast.error("Failed to load locations"); }
@@ -39,8 +40,8 @@ export default function LocationsAdminPage() {
     try {
       const now = Timestamp.now();
       const base = { ...current, organizationId, updatedAt: now, updatedBy: user?.uid, schemaVersion: 1 };
-      if (isEditing && current.id) { await updateDoc(doc(db, "locations", current.id), base); toast.success("Location updated"); }
-      else { await addDoc(collection(db, "locations"), { ...base, createdAt: now, createdBy: user?.uid, status: "active" }); toast.success("Location created"); }
+      if (isEditing && current.id) { await updateDoc(doc(db, COLLECTIONS.locations, current.id), base); toast.success("Location updated"); }
+      else { await addDoc(collection(db, COLLECTIONS.locations), { ...base, createdAt: now, createdBy: user?.uid, status: "active" }); toast.success("Location created"); }
       setIsEditing(false); setCurrent({ name: "", address: { street: "", city: "", state: "", zip: "", country: "US" }, operatingHours: {} });
       fetchLocations();
     } catch { toast.error("Failed to save location"); }
@@ -48,7 +49,7 @@ export default function LocationsAdminPage() {
 
   const handleDelete = async (loc: Location) => {
     if (!confirm(`Delete ${loc.name}?`)) return;
-    try { await deleteDoc(doc(db, "locations", loc.id)); toast.success("Deleted"); fetchLocations(); }
+    try { await deleteDoc(doc(db, COLLECTIONS.locations, loc.id)); toast.success("Deleted"); fetchLocations(); }
     catch { toast.error("Failed to delete"); }
   };
 

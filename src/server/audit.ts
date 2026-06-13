@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 import { type AuditCategory, type AuditLog } from "@/types";
 
 interface AuditLogInput {
@@ -31,7 +32,7 @@ export async function logAuditEvent(input: AuditLogInput): Promise<void> {
       schemaVersion: 1,
     };
 
-    await adminDb.collection("auditLogs").add(logEntry);
+    await adminDb.collection(COLLECTIONS.auditLogs).add(logEntry);
   } catch (error) {
     console.error("Failed to write audit log:", error);
   }

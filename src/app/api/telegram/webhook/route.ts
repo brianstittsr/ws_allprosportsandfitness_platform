@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 import { logAuditEvent } from "@/server/audit";
 import { createGitHubService, updateCodeViaTelegram, createDeploymentPullRequest } from "@/server/github";
 
@@ -36,7 +37,7 @@ function sendTelegramMessage(chatId: number, text: string): Promise<void> {
 }
 
 async function verifyTelegramUser(telegramUserId: number): Promise<{ userId: string; permissions: Record<string, boolean>; displayName: string } | null> {
-  const q = adminDb.collection("userAccess").where("telegramUserId", "==", String(telegramUserId)).limit(1);
+  const q = adminDb.collection(COLLECTIONS.userAccess).where("telegramUserId", "==", String(telegramUserId)).limit(1);
   const snapshot = await q.get();
   if (snapshot.empty) return null;
   const data = snapshot.docs[0].data();
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const organizationDoc = await adminDb.collection("organizations").limit(1).get();
+    const organizationDoc = await adminDb.collection(COLLECTIONS.organizations).limit(1).get();
     const organizationId = organizationDoc.empty ? "default" : organizationDoc.docs[0].id;
 
     if (text.startsWith("/help")) {

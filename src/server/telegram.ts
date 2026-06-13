@@ -1,3 +1,5 @@
+import { COLLECTIONS } from "@/lib/schema";
+
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 export async function sendTelegramMessage(
@@ -61,7 +63,7 @@ export async function sendTelegramAlert(
 export async function verifyTelegramUser(telegramUserId: number): Promise<{ userId: string; permissions: Record<string, boolean>; displayName: string; organizationId: string } | null> {
   const { adminDb } = await import("@/lib/firebase-admin");
 
-  const q = adminDb.collection("userAccess").where("telegramUserId", "==", String(telegramUserId)).limit(1);
+  const q = adminDb.collection(COLLECTIONS.userAccess).where("telegramUserId", "==", String(telegramUserId)).limit(1);
   const snapshot = await q.get();
 
   if (snapshot.empty) return null;

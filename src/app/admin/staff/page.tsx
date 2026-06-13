@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { type Staff } from "@/types";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import BulkImportWizard from "@/components/bulk-import-wizard";
+import { Plus, Pencil, Trash2, Upload } from "lucide-react";
 
 export default function StaffAdminPage() {
   const { user, userAccess } = useAuth();
@@ -23,6 +25,7 @@ export default function StaffAdminPage() {
     communicationPermissions: { canEmailClients: false, canSmsClients: false, canEmailStaff: false, canSendBulkMessages: false, requiresApprovalForBulk: true },
     isActive: true,
   });
+  const [showWizard, setShowWizard] = useState(false);
   const organizationId = userAccess?.organizationId || "default";
 
   useEffect(() => { fetchStaff(); }, [organizationId]);
@@ -30,7 +33,7 @@ export default function StaffAdminPage() {
   const fetchStaff = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "staff"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.staff), where("organizationId", "==", organizationId));
       const snapshot = await getDocs(q);
       setStaff(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Staff));
     } catch { toast.error("Failed to load staff"); }
@@ -42,8 +45,8 @@ export default function StaffAdminPage() {
     try {
       const now = Timestamp.now();
       const base = { ...current, organizationId, updatedAt: now, updatedBy: user?.uid, schemaVersion: 1 };
-      if (isEditing && current.id) { await updateDoc(doc(db, "staff", current.id), base); toast.success("Staff updated"); }
-      else { await addDoc(collection(db, "staff"), { ...base, createdAt: now, createdBy: user?.uid, status: "active" }); toast.success("Staff created"); }
+      if (isEditing && current.id) { await updateDoc(doc(db, COLLECTIONS.staff, current.id), base); toast.success("Staff updated"); }
+      else { await addDoc(collection(db, COLLECTIONS.staff), { ...base, createdAt: now, createdBy: user?.uid, status: "active" }); toast.success("Staff created"); }
       setIsEditing(false); setCurrent({ contactId: "", departmentIds: [], programIds: [], jobTitle: "", jobDuties: [], employmentType: "full_time", startDate: Timestamp.now(), permissions: { canManageContacts: false, canManagePrograms: false, canViewFinancials: false, canManageFinancials: false, canApprovePayouts: false, canAccessAdmin: false, canUseHermes: false }, communicationPermissions: { canEmailClients: false, canSmsClients: false, canEmailStaff: false, canSendBulkMessages: false, requiresApprovalForBulk: true }, isActive: true });
       fetchStaff();
     } catch { toast.error("Failed to save staff"); }
@@ -51,8 +54,22 @@ export default function StaffAdminPage() {
 
   const handleDelete = async (s: Staff) => {
     if (!confirm(`Delete staff record?`)) return;
-    try { await deleteDoc(doc(db, "staff", s.id)); toast.success("Deleted"); fetchStaff(); }
+    try { await deleteDoc(doc(db, COLLECTIONS.staff, s.id)); toast.success("Deleted"); fetchStaff(); }
     catch { toast.error("Failed to delete"); }
+  };
+
+  const handleStaffImport = async (rows: Record<string, string>[], options: { mergeDuplicates: boolean; defaultStatus?: string }) => {
+    const idToken = await user?.getIdToken();
+    const csvText = [Object.keys(rows[0] || {}).join(","), ...rows.map((r) => Object.values(r).join(","))].join("\n");
+    const response = await fetch("/api/staff/import", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ format: "csv", data: [csvText], organizationId, mergeDuplicates: options.mergeDuplicates }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Import failed");
+    fetchStaff();
+    return result.data;
   };
 
   return (
@@ -62,9 +79,14 @@ export default function StaffAdminPage() {
           <h1 className="text-3xl font-bold tracking-tight">Staff</h1>
           <p className="text-muted-foreground">Manage staff, coaches, and instructors.</p>
         </div>
-        <Button onClick={() => { setIsEditing(false); setCurrent({ contactId: "", departmentIds: [], programIds: [], jobTitle: "", jobDuties: [], employmentType: "full_time", startDate: Timestamp.now(), permissions: { canManageContacts: false, canManagePrograms: false, canViewFinancials: false, canManageFinancials: false, canApprovePayouts: false, canAccessAdmin: false, canUseHermes: false }, communicationPermissions: { canEmailClients: false, canSmsClients: false, canEmailStaff: false, canSendBulkMessages: false, requiresApprovalForBulk: true }, isActive: true }); }}>
-          <Plus className="h-4 w-4 mr-2" />New Staff
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowWizard(!showWizard)}>
+            <Upload className="h-4 w-4 mr-2" />Import
+          </Button>
+          <Button onClick={() => { setIsEditing(false); setCurrent({ contactId: "", departmentIds: [], programIds: [], jobTitle: "", jobDuties: [], employmentType: "full_time", startDate: Timestamp.now(), permissions: { canManageContacts: false, canManagePrograms: false, canViewFinancials: false, canManageFinancials: false, canApprovePayouts: false, canAccessAdmin: false, canUseHermes: false }, communicationPermissions: { canEmailClients: false, canSmsClients: false, canEmailStaff: false, canSendBulkMessages: false, requiresApprovalForBulk: true }, isActive: true }); }}>
+            <Plus className="h-4 w-4 mr-2" />New Staff
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -90,6 +112,26 @@ export default function StaffAdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      {showWizard && (
+        <BulkImportWizard
+          title="Staff"
+          description="Import staff, coaches, and instructors from CSV."
+          requiredFields={["firstName", "lastName", "email", "jobTitle"]}
+          optionalFields={[
+            { key: "phone", label: "Phone" },
+            { key: "employmentType", label: "Employment Type" },
+            { key: "departmentIds", label: "Department IDs" },
+            { key: "programIds", label: "Program IDs" },
+            { key: "supervisorId", label: "Supervisor ID" },
+            { key: "isActive", label: "Is Active" },
+          ]}
+          templateHeaders="firstName,lastName,email,phone,jobTitle,employmentType,departmentIds,programIds,supervisorId,isActive"
+          templateRow="Jane,Doe,jane@example.com,5551234567,Yoga Instructor,full_time,dept1;dept2,prog1;prog2,supervisor123,true"
+          onImport={handleStaffImport}
+          onClose={() => { setShowWizard(false); fetchStaff(); }}
+        />
+      )}
 
       <Card>
         <CardHeader><CardTitle>All Staff</CardTitle><CardDescription>{staff.length} found.</CardDescription></CardHeader>

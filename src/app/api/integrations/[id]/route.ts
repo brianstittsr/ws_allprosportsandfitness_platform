@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -38,7 +39,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
     if (body.errorCount !== undefined) updateData.errorCount = body.errorCount;
 
-    await adminDb.collection("integrations").doc(id).update(updateData);
+    await adminDb.collection(COLLECTIONS.integrations).doc(id).update(updateData);
 
     return NextResponse.json({ data: { id } });
   } catch (error) {
@@ -62,7 +63,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    await adminDb.collection("integrations").doc(id).delete();
+    await adminDb.collection(COLLECTIONS.integrations).doc(id).delete();
 
     return NextResponse.json({ data: { id, deleted: true } });
   } catch (error) {

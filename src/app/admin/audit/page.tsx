@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,7 @@ export default function AuditAdminPage() {
     setIsLoading(true);
     try {
       let q = query(
-        collection(db, "auditLogs"),
+        collection(db, COLLECTIONS.auditLogs),
         where("organizationId", "==", organizationId),
         orderBy("createdAt", "desc"),
         limit(100)

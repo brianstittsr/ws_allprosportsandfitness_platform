@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 import { createHighLevelService } from "@/server/highlevel";
 import { bulkImportContacts } from "@/server/contacts";
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // For large imports, queue as background job
     if (inputs.length > 50) {
-      const jobRef = await adminDb.collection("communicationJobs").add({
+      const jobRef = await adminDb.collection(COLLECTIONS.communicationJobs).add({
         name: `GoHighLevel Contact Sync - ${inputs.length} contacts`,
         type: "import",
         status: "pending",
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
         schemaVersion: 1,
       });
 
-      await adminDb.collection("tasks").add({
+      await adminDb.collection(COLLECTIONS.tasks).add({
         type: "highlevel_contact_sync",
         status: "pending",
         jobId: jobRef.id,
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     // Update integration record with sync timestamp
     const integrationQuery = await adminDb
-      .collection("integrations")
+      .collection(COLLECTIONS.integrations)
       .where("organizationId", "==", organizationId)
       .where("provider", "==", "highlevel")
       .limit(1)

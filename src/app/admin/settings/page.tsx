@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,7 @@ export default function SettingsAdminPage() {
   const fetchIntegrations = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "integrations"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.integrations), where("organizationId", "==", organizationId));
       const snapshot = await getDocs(q);
       setIntegrations(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Integration));
     } catch { toast.error("Failed to load integrations"); }
@@ -53,7 +54,7 @@ export default function SettingsAdminPage() {
   const handleSaveConfig = async (integration: Integration) => {
     try {
       const now = Timestamp.now();
-      await updateDoc(doc(db, "integrations", integration.id), {
+      await updateDoc(doc(db, COLLECTIONS.integrations, integration.id), {
         config: editConfig,
         updatedAt: now,
         updatedBy: user?.uid,
@@ -67,7 +68,7 @@ export default function SettingsAdminPage() {
   const handleToggleStatus = async (integration: Integration) => {
     const newStatus = integration.status === "active" ? "inactive" : "active";
     try {
-      await updateDoc(doc(db, "integrations", integration.id), {
+      await updateDoc(doc(db, COLLECTIONS.integrations, integration.id), {
         status: newStatus,
         updatedAt: Timestamp.now(),
         updatedBy: user?.uid,
@@ -125,7 +126,7 @@ export default function SettingsAdminPage() {
   const handleAddIntegration = async () => {
     if (!newIntegration.name || !newIntegration.provider) { toast.error("Name and provider are required"); return; }
     try {
-      await addDoc(collection(db, "integrations"), {
+      await addDoc(collection(db, COLLECTIONS.integrations), {
         ...newIntegration,
         organizationId,
         createdAt: Timestamp.now(),

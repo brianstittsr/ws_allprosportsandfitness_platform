@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +51,7 @@ export default function UsersAdminPage() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "userAccess"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.userAccess), where("organizationId", "==", organizationId));
       const snapshot = await getDocs(q);
       setUsers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as UserAccess));
     } catch { toast.error("Failed to load users"); }
@@ -62,8 +63,8 @@ export default function UsersAdminPage() {
     try {
       const now = Timestamp.now();
       const base = { ...current, organizationId, updatedAt: now, updatedBy: user?.uid, schemaVersion: 1 };
-      if (isEditing && current.id) { await updateDoc(doc(db, "userAccess", current.id), base); toast.success("User updated"); }
-      else { await addDoc(collection(db, "userAccess"), { ...base, createdAt: now, createdBy: user?.uid, status: "active" }); toast.success("User created"); }
+      if (isEditing && current.id) { await updateDoc(doc(db, COLLECTIONS.userAccess, current.id), base); toast.success("User updated"); }
+      else { await addDoc(collection(db, COLLECTIONS.userAccess), { ...base, createdAt: now, createdBy: user?.uid, status: "active" }); toast.success("User created"); }
       setIsEditing(false); setCurrent({ displayName: "", email: "", roles: [], programIds: [], departmentIds: [], permissions: { viewFinancials: false, manageFinancials: false, approvePayments: false, sendClientMessages: false, sendStaffMessages: false, manageContacts: false, managePrograms: false, manageUsers: false, accessAdminPanel: false, useHermes: false }, accountStatus: "active" });
       fetchUsers();
     } catch { toast.error("Failed to save user"); }

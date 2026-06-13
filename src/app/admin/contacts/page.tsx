@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { type Contact, type ContactType } from "@/types";
+import BulkImportWizard from "@/components/bulk-import-wizard";
 import { Plus, Pencil, Trash2, Upload, Download, RefreshCw, Activity } from "lucide-react";
 
 const contactTypes: ContactType[] = [
@@ -26,11 +28,8 @@ export default function ContactsAdminPage() {
     firstName: "", lastName: "", email: "", preferredLanguage: "en", contactTypes: [], programIds: [],
     emailConsent: false, smsConsent: false, optOutStatus: false, tags: [], customFields: {}, externalIds: {},
   });
-  const [importLoading, setImportLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
-  const [csvContent, setCsvContent] = useState("");
-  const [showImport, setShowImport] = useState(false);
-  const [mergeDuplicates, setMergeDuplicates] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
   const organizationId = userAccess?.organizationId || "default";
 
   useEffect(() => { fetchContacts(); }, [organizationId]);
@@ -38,7 +37,7 @@ export default function ContactsAdminPage() {
   const fetchContacts = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "contacts"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.contacts), where("organizationId", "==", organizationId));
       const snapshot = await getDocs(q);
       setContacts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Contact));
     } catch { toast.error("Failed to load contacts"); }
@@ -51,7 +50,7 @@ export default function ContactsAdminPage() {
       const now = Timestamp.now();
       const base = { ...current, organizationId, updatedAt: now, updatedBy: user?.uid, schemaVersion: 1 };
       if (isEditing && current.id) { await updateDoc(doc(db, "contacts", current.id), base); toast.success("Contact updated"); }
-      else { await addDoc(collection(db, "contacts"), { ...base, createdAt: now, createdBy: user?.uid, status: "active", currentStatus: "new_lead" }); toast.success("Contact created"); }
+      else { await addDoc(collection(db, COLLECTIONS.contacts), { ...base, createdAt: now, createdBy: user?.uid, status: "active", currentStatus: "new_lead" }); toast.success("Contact created"); }
       setIsEditing(false); setCurrent({ firstName: "", lastName: "", email: "", preferredLanguage: "en", contactTypes: [], programIds: [], emailConsent: false, smsConsent: false, optOutStatus: false, tags: [], customFields: {}, externalIds: {} });
       fetchContacts();
     } catch { toast.error("Failed to save contact"); }
@@ -59,7 +58,7 @@ export default function ContactsAdminPage() {
 
   const handleDelete = async (c: Contact) => {
     if (!confirm(`Delete ${c.firstName} ${c.lastName}?`)) return;
-    try { await deleteDoc(doc(db, "contacts", c.id)); toast.success("Deleted"); fetchContacts(); }
+    try { await deleteDoc(doc(db, COLLECTIONS.contacts, c.id)); toast.success("Deleted"); fetchContacts(); }
     catch { toast.error("Failed to delete"); }
   };
 
@@ -69,45 +68,6 @@ export default function ContactsAdminPage() {
     else { setCurrent({ ...current, contactTypes: [...types, type] }); }
   };
 
-  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => { setCsvContent(event.target?.result as string); };
-    reader.readAsText(file);
-  };
-
-  const handleBulkImport = async () => {
-    if (!csvContent.trim()) { toast.error("Please upload a CSV file or paste CSV content"); return; }
-    setImportLoading(true);
-    try {
-      const idToken = await user?.getIdToken();
-      const response = await fetch("/api/contacts/import", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          format: "csv",
-          data: [csvContent],
-          organizationId,
-          mergeDuplicates,
-          defaultStatus: "new_lead",
-        }),
-      });
-      const result = await response.json();
-      if (response.ok) {
-        if (result.data?.status === "queued") {
-          toast.success(result.data.message);
-        } else {
-          toast.success(`Import complete: ${result.data.created} created, ${result.data.updated} updated, ${result.data.skipped} skipped`);
-        }
-        setCsvContent(""); setShowImport(false); fetchContacts();
-      } else {
-        toast.error(result.error || "Import failed");
-      }
-    } catch { toast.error("Import request failed"); }
-    finally { setImportLoading(false); }
-  };
-
   const handleSyncHighLevel = async () => {
     setSyncLoading(true);
     try {
@@ -115,38 +75,33 @@ export default function ContactsAdminPage() {
       const response = await fetch("/api/contacts/sync-highlevel", {
         method: "POST",
         headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationId,
-          mergeDuplicates: true,
-          defaultStatus: "new_lead",
-          limit: 100,
-        }),
+        body: JSON.stringify({ organizationId, mergeDuplicates: true, defaultStatus: "new_lead", limit: 100 }),
       });
       const result = await response.json();
       if (response.ok) {
-        if (result.data?.status === "queued") {
-          toast.success(result.data.message);
-        } else {
-          toast.success(`GoHighLevel sync: ${result.data.created} created, ${result.data.updated} updated, ${result.data.skipped} skipped (${result.data.totalFetched} fetched)`);
-        }
+        if (result.data?.status === "queued") toast.success(result.data.message);
+        else toast.success(`GoHighLevel sync: ${result.data.created} created, ${result.data.updated} updated, ${result.data.skipped} skipped (${result.data.totalFetched} fetched)`);
         fetchContacts();
-      } else {
-        toast.error(result.error || "Sync failed");
-      }
+      } else toast.error(result.error || "Sync failed");
     } catch { toast.error("Sync request failed"); }
     finally { setSyncLoading(false); }
   };
 
-  const downloadTemplate = () => {
-    const headers = "firstName,lastName,email,phone,contactTypes,leadSource,tags,emailConsent,smsConsent";
-    const row = "Jane,Doe,jane@example.com,5551234567,prospect;active_client,website,summer2024,true,true";
-    const blob = new Blob([headers + "\n" + row], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "contacts_template.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleContactsImport = async (rows: Record<string, string>[], options: { mergeDuplicates: boolean; defaultStatus?: string }) => {
+    const idToken = await user?.getIdToken();
+    const csvText = [
+      Object.keys(rows[0] || {}).join(","),
+      ...rows.map((r) => Object.values(r).join(",")),
+    ].join("\n");
+    const response = await fetch("/api/contacts/import", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ format: "csv", data: [csvText], organizationId, mergeDuplicates: options.mergeDuplicates, defaultStatus: options.defaultStatus || "new_lead" }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Import failed");
+    fetchContacts();
+    return result.data;
   };
 
   return (
@@ -157,7 +112,7 @@ export default function ContactsAdminPage() {
           <p className="text-muted-foreground">Manage clients, leads, staff, and partners.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowImport(!showImport)}>
+          <Button variant="outline" onClick={() => setShowWizard(!showWizard)}>
             <Upload className="h-4 w-4 mr-2" />Import
           </Button>
           <Button variant="outline" onClick={handleSyncHighLevel} disabled={syncLoading}>
@@ -192,43 +147,24 @@ export default function ContactsAdminPage() {
         </CardContent>
       </Card>
 
-      {showImport && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Bulk Import Contacts</CardTitle>
-            <CardDescription>Upload CSV or paste content. Large imports will be processed in the background.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={downloadTemplate}>
-                <Download className="h-4 w-4 mr-2" />Download CSV Template
-              </Button>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="mergeDup" checked={mergeDuplicates} onChange={(e) => setMergeDuplicates(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
-                <Label htmlFor="mergeDup" className="text-sm font-normal">Merge duplicates</Label>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Upload CSV</Label>
-              <Input type="file" accept=".csv" onChange={handleCsvFileChange} />
-            </div>
-            <div className="space-y-2">
-              <Label>Or paste CSV content</Label>
-              <textarea
-                className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                value={csvContent}
-                onChange={(e) => setCsvContent(e.target.value)}
-                placeholder="firstName,lastName,email,phone,contactTypes,leadSource,tags,emailConsent,smsConsent"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleBulkImport} disabled={importLoading}>
-                <Upload className="h-4 w-4 mr-2" />{importLoading ? "Importing..." : "Import Contacts"}
-              </Button>
-              <Button variant="outline" onClick={() => setShowImport(false)}>Cancel</Button>
-            </div>
-          </CardContent>
-        </Card>
+      {showWizard && (
+        <BulkImportWizard
+          title="Contacts"
+          description="Import clients, leads, and partners from CSV."
+          requiredFields={["firstName", "lastName", "email"]}
+          optionalFields={[
+            { key: "phone", label: "Phone" },
+            { key: "contactTypes", label: "Contact Types" },
+            { key: "leadSource", label: "Lead Source" },
+            { key: "tags", label: "Tags" },
+            { key: "emailConsent", label: "Email Consent" },
+            { key: "smsConsent", label: "SMS Consent" },
+          ]}
+          templateHeaders="firstName,lastName,email,phone,contactTypes,leadSource,tags,emailConsent,smsConsent"
+          templateRow="Jane,Doe,jane@example.com,5551234567,prospect;active_client,website,summer2024,true,true"
+          onImport={handleContactsImport}
+          onClose={() => { setShowWizard(false); fetchContacts(); }}
+        />
       )}
 
       <Card>

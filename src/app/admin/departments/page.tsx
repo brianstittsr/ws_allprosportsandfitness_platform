@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,7 @@ export default function DepartmentsAdminPage() {
   const fetchDepartments = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "departments"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.departments), where("organizationId", "==", organizationId));
       const snapshot = await getDocs(q);
       setDepartments(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Department));
     } catch (error) {
@@ -46,10 +47,10 @@ export default function DepartmentsAdminPage() {
       const now = Timestamp.now();
       const base = { ...current, organizationId, updatedAt: now, updatedBy: user?.uid, schemaVersion: 1 };
       if (isEditing && current.id) {
-        await updateDoc(doc(db, "departments", current.id), base);
+        await updateDoc(doc(db, COLLECTIONS.departments, current.id), base);
         toast.success("Department updated");
       } else {
-        await addDoc(collection(db, "departments"), { ...base, createdAt: now, createdBy: user?.uid, status: "active" });
+        await addDoc(collection(db, COLLECTIONS.departments), { ...base, createdAt: now, createdBy: user?.uid, status: "active" });
         toast.success("Department created");
       }
       setIsEditing(false); setCurrent({ name: "", type: "operations", managerIds: [], locationIds: [] });
@@ -59,7 +60,7 @@ export default function DepartmentsAdminPage() {
 
   const handleDelete = async (dept: Department) => {
     if (!confirm(`Delete ${dept.name}?`)) return;
-    try { await deleteDoc(doc(db, "departments", dept.id)); toast.success("Deleted"); fetchDepartments(); }
+    try { await deleteDoc(doc(db, COLLECTIONS.departments, dept.id)); toast.success("Deleted"); fetchDepartments(); }
     catch { toast.error("Failed to delete"); }
   };
 

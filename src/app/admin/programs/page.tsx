@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +38,7 @@ export default function ProgramsAdminPage() {
   const fetchPrograms = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "programs"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.programs), where("organizationId", "==", organizationId));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Program);
       setPrograms(data);
@@ -66,10 +67,10 @@ export default function ProgramsAdminPage() {
       };
 
       if (isEditing && currentProgram.id) {
-        await updateDoc(doc(db, "programs", currentProgram.id), baseData);
+        await updateDoc(doc(db, COLLECTIONS.programs, currentProgram.id), baseData);
         toast.success("Program updated");
       } else {
-        await addDoc(collection(db, "programs"), {
+        await addDoc(collection(db, COLLECTIONS.programs), {
           ...baseData,
           createdAt: now,
           createdBy: user?.uid,
@@ -100,7 +101,7 @@ export default function ProgramsAdminPage() {
     if (!confirm(`Are you sure you want to delete ${program.name}?`)) return;
 
     try {
-      await deleteDoc(doc(db, "programs", program.id));
+      await deleteDoc(doc(db, COLLECTIONS.programs, program.id));
       toast.success("Program deleted");
       fetchPrograms();
     } catch (error) {

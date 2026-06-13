@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ export default function IntegrationsAdminPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "integrations"), where("organizationId", "==", organizationId));
+      const q = query(collection(db, COLLECTIONS.integrations), where("organizationId", "==", organizationId));
       const snap = await getDocs(q);
       setIntegrations(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Integration));
     } catch { toast.error("Failed to load integrations"); }

@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 import { Timestamp } from "firebase-admin/firestore";
 import { logAuditEvent } from "@/server/audit";
 
@@ -39,7 +40,7 @@ export async function findExistingContact(
 
   if (email) {
     const q = adminDb
-      .collection("contacts")
+      .collection(COLLECTIONS.contacts)
       .where("organizationId", "==", organizationId)
       .where("email", "==", email.toLowerCase().trim())
       .limit(1);
@@ -50,7 +51,7 @@ export async function findExistingContact(
   if (phone) {
     const normalizedPhone = phone.replace(/\D/g, "");
     const q = adminDb
-      .collection("contacts")
+      .collection(COLLECTIONS.contacts)
       .where("organizationId", "==", organizationId)
       .where("phone", "==", normalizedPhone)
       .limit(1);
@@ -110,7 +111,7 @@ export async function importSingleContact(
       if (existing.data.createdAt) merged.createdAt = existing.data.createdAt;
       if (existing.data.createdBy) merged.createdBy = existing.data.createdBy;
 
-      await adminDb.collection("contacts").doc(existing.id).update(merged);
+      await adminDb.collection(COLLECTIONS.contacts).doc(existing.id).update(merged);
       return { id: existing.id, action: "updated" };
     }
     return { id: existing.id, action: "skipped" };
@@ -120,7 +121,7 @@ export async function importSingleContact(
   contactData.createdAt = now;
   contactData.createdBy = userId;
 
-  const docRef = await adminDb.collection("contacts").add(contactData);
+  const docRef = await adminDb.collection(COLLECTIONS.contacts).add(contactData);
   return { id: docRef.id, action: "created" };
 }
 
@@ -155,7 +156,7 @@ export async function bulkImportContacts(
     action: "bulk_import_contacts",
     category: "import",
     userId,
-    resourceType: "contacts",
+    resourceType: COLLECTIONS.contacts,
     resourceId: "bulk",
     organizationId,
     metadata: {

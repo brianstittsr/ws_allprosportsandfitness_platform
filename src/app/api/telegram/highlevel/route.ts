@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 import { logAuditEvent } from "@/server/audit";
 import { createHighLevelService, syncContactToHighLevel } from "@/server/highlevel";
 
@@ -29,7 +30,7 @@ function sendTelegramMessage(chatId: number, text: string): Promise<void> {
 }
 
 async function verifyTelegramUser(telegramUserId: number): Promise<{ userId: string; permissions: Record<string, boolean>; displayName: string; organizationId: string } | null> {
-  const q = adminDb.collection("userAccess").where("telegramUserId", "==", String(telegramUserId)).limit(1);
+  const q = adminDb.collection(COLLECTIONS.userAccess).where("telegramUserId", "==", String(telegramUserId)).limit(1);
   const snapshot = await q.get();
   if (snapshot.empty) return null;
   const data = snapshot.docs[0].data();
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const contactDoc = await adminDb.collection("contacts").doc(contactId).get();
+        const contactDoc = await adminDb.collection(COLLECTIONS.contacts).doc(contactId).get();
         if (!contactDoc.exists) {
           await sendTelegramMessage(chatId, `Contact ${contactId} not found.`);
           return NextResponse.json({ ok: true });

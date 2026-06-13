@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 import { bulkImportContacts, parseCsvContacts } from "@/server/contacts";
 
 export async function POST(request: NextRequest) {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // For large imports, create a background job
     if (inputs.length > 50) {
-      const jobRef = await adminDb.collection("communicationJobs").add({
+      const jobRef = await adminDb.collection(COLLECTIONS.communicationJobs).add({
         name: `Bulk Contact Import - ${inputs.length} contacts`,
         type: "import",
         status: "pending",
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Store inputs in a temporary collection for async processing
-      await adminDb.collection("tasks").add({
+      await adminDb.collection(COLLECTIONS.tasks).add({
         type: "bulk_contact_import",
         status: "pending",
         jobId: jobRef.id,

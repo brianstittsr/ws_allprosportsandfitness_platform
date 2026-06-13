@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { COLLECTIONS } from "@/lib/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,11 +23,11 @@ export default function CommunicationsAdminPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const jobsQ = query(collection(db, "communicationJobs"), where("organizationId", "==", organizationId));
+      const jobsQ = query(collection(db, COLLECTIONS.communicationJobs), where("organizationId", "==", organizationId));
       const jobsSnap = await getDocs(jobsQ);
       setJobs(jobsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as CommunicationJob));
 
-      const tmplQ = query(collection(db, "communicationTemplates"), where("organizationId", "==", organizationId));
+      const tmplQ = query(collection(db, COLLECTIONS.communicationTemplates), where("organizationId", "==", organizationId));
       const tmplSnap = await getDocs(tmplQ);
       setTemplates(tmplSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as CommunicationTemplate));
     } catch { toast.error("Failed to load communications"); }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { COLLECTIONS } from "@/lib/schema";
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const snapshot = await adminDb
-      .collection("integrations")
+      .collection(COLLECTIONS.integrations)
       .where("organizationId", "==", organizationId)
       .orderBy("createdAt", "desc")
       .get();
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "organizationId, name, and provider are required" }, { status: 400 });
     }
 
-    const docRef = await adminDb.collection("integrations").add({
+    const docRef = await adminDb.collection(COLLECTIONS.integrations).add({
       name: body.name,
       provider: body.provider,
       type: body.type || "custom",
