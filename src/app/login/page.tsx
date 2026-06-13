@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,10 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFirebaseConfigured) {
+      toast.error("Firebase is not configured. Use the guest button below or add environment variables.");
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -46,6 +50,11 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">NC Fitness Club</CardTitle>
           <CardDescription>Unified Operations Platform</CardDescription>
+          {!isFirebaseConfigured && (
+            <p className="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded">
+              Firebase is not configured. Sign-in is disabled. Use the guest button below to preview.
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">

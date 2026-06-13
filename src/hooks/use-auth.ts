@@ -3,14 +3,24 @@
 import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/auth-store";
 import { type UserAccess } from "@/types";
 
 export function useAuth() {
-  const { user, userAccess, isLoading, setUser, setUserAccess, setLoading } = useAuthStore();
+  const { user, userAccess, isLoading, bypass, setUser, setUserAccess, setLoading } = useAuthStore();
 
   useEffect(() => {
+    if (bypass) {
+      setLoading(false);
+      return;
+    }
+    if (!isFirebaseConfigured) {
+      console.warn("Firebase client SDK not configured — auth state will not be tracked");
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
 
@@ -31,7 +41,7 @@ export function useAuth() {
     });
 
     return () => unsubscribe();
-  }, [setUser, setUserAccess, setLoading]);
+  }, [setUser, setUserAccess, setLoading, bypass]);
 
-  return { user, userAccess, isLoading };
+  return { user, userAccess, isLoading, bypass };
 }

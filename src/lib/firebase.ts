@@ -8,14 +8,20 @@ let _auth: Auth | undefined;
 let _db: Firestore | undefined;
 let _storage: FirebaseStorage | undefined;
 
+export const isFirebaseConfigured = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
 function getFirebaseApp(): FirebaseApp {
   if (_app) return _app;
   if (getApps().length > 0) {
     _app = getApp();
     return _app;
   }
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Firebase client SDK not configured — NEXT_PUBLIC_FIREBASE_API_KEY is missing");
+  }
   const config = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+    apiKey,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",

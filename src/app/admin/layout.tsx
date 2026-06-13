@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import {
   LayoutDashboard,
   Users,
@@ -43,13 +43,13 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, userAccess, isLoading } = useAuth();
+  const { user, userAccess, isLoading, bypass } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && (!user || !userAccess?.permissions.accessAdminPanel)) {
+    if (!isLoading && !bypass && (!user || !userAccess?.permissions.accessAdminPanel)) {
       router.push("/login");
     }
-  }, [user, userAccess, isLoading, router]);
+  }, [user, userAccess, isLoading, bypass, router]);
 
   if (isLoading) {
     return (
@@ -59,7 +59,7 @@ export default function AdminLayout({
     );
   }
 
-  if (!user || !userAccess?.permissions.accessAdminPanel) {
+  if (!bypass && (!user || !userAccess?.permissions.accessAdminPanel)) {
     return null;
   }
 
@@ -91,7 +91,9 @@ export default function AdminLayout({
             variant="outline"
             className="w-full justify-start gap-2"
             onClick={() => {
-              signOut(auth);
+              if (isFirebaseConfigured) {
+                signOut(auth);
+              }
               router.push("/login");
             }}
           >

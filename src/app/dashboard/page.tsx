@@ -6,18 +6,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { Calendar, Users, CheckSquare, MessageSquare } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, userAccess, isLoading } = useAuth();
+  const { user, userAccess, isLoading, bypass } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!isLoading && !bypass && !user) {
       router.push("/login");
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, bypass, router]);
 
   if (isLoading) {
     return (
@@ -27,7 +27,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
+  if (!bypass && !user) {
     return null;
   }
 
@@ -45,7 +45,9 @@ export default function DashboardPage() {
             <Button
               variant="ghost"
               onClick={() => {
-                signOut(auth);
+                if (isFirebaseConfigured) {
+                  signOut(auth);
+                }
                 router.push("/login");
               }}
             >
