@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useAuthStore } from "@/stores/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +13,16 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
+  const bypassLogin = useAuthStore((s) => s.bypassLogin);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleBypass = () => {
+    bypassLogin();
+    toast.success("Bypassed login — welcome, Developer");
+    router.push("/dashboard");
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +75,11 @@ export default function LoginPage() {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+          <div className="mt-4 pt-4 border-t text-center">
+            <Button variant="ghost" size="sm" onClick={handleBypass}>
+              Continue as Guest (Development)
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
